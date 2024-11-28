@@ -33,7 +33,9 @@ from ddb_client import (
 
 ### dynamo_search
 
-The `dynamo_search` function allows searching for records in a DynamoDB table using specific key conditions and optional filters. *[Support helpers](#helpers)* for filterExpressions and Sort Keys
+The `dynamo_search` function allows searching for records in a DynamoDB table using specific key conditions and optional filters. 
+> [!NOTE]
+> The dynamo_search function *[Support helpers](#helpers)* for Sort Keys and FilterExpressions
 
 #### Function Definition
 
@@ -95,7 +97,9 @@ print(result)
 
 ### dynamo_counter
 
-The `dynamo_counter` function counts the total number of items that meet certain conditions in a DynamoDB table. *[Support helpers](#helpers)* for filterExpressions
+The `dynamo_counter` function counts the total number of items that meet certain conditions in a DynamoDB table. 
+> [!NOTE]
+> The dynamo_counter function *[Support helpers](#helpers)* only for FilterExpressions
 
 #### Function Definition
 
@@ -262,7 +266,7 @@ class DynamoComparison:
 
 ```python
 from ddb_client.helpers import DynamoComparison as dynamo_cmp
-from ddb_client.search import dynamo_search
+from ddb_client import dynamo_search
 
 params = {
     'user_id': '425034',
