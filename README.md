@@ -31,10 +31,9 @@ from ddb_client import (
 
 ## Functions
 
-<a name="headers"></a>
 ### dynamo_search
 
-The `dynamo_search` function allows searching for records in a DynamoDB table using specific key conditions and optional filters.
+The `dynamo_search` function allows searching for records in a DynamoDB table using specific key conditions and optional filters. *[Support helpers](#helpers)* for filterExpressions and Sort Keys
 
 #### Function Definition
 
@@ -96,7 +95,7 @@ print(result)
 
 ### dynamo_counter
 
-The `dynamo_counter` function counts the total number of items that meet certain conditions in a DynamoDB table.
+The `dynamo_counter` function counts the total number of items that meet certain conditions in a DynamoDB table. *[Support helpers](#helpers)* for filterExpressions
 
 #### Function Definition
 
@@ -114,7 +113,7 @@ def dynamo_counter(table, params):
 
 A dictionary with the structure:
 
-```json
+```js
 {
     "Count_Items": 0,  // Total number of items meeting the conditions.
     "Pages": 0         // Total number of pages, considering pagination settings.
@@ -157,8 +156,7 @@ def batch_get_items(table, source, **keys_fields):
   - **logger_result**: Log the retrieved items.
 
 #### Return
-
-- A list of items retrieved from the table.
+A list of items retrieved from the table.
 
 #### Usage Example
 
@@ -274,7 +272,7 @@ params = {
 result = dynamo_search('recents', params, limit=True)
 print(result)
 ```
-
+> [!NOTE]  
 > The `is_key` parameter indicates whether it is a table key and should be constructed with the `Key` class instead of `Attr`.
 
 ---
@@ -294,12 +292,3 @@ print(result)
 
 - `batch_get_items` is limited to retrieving a maximum of 100 items per batch due to DynamoDB restrictions.
 - `dynamo_search` supports searches based on primary and sort keys; more complex queries may require additional customization.
-
-## Building
-
-Command to build the `.zip` file for use in AWS Lambda Layers:
-
-```bash
-cd python
-zip -r ../ddb_client.zip .
-```
