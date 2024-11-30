@@ -1,6 +1,6 @@
 # DynamoDB Utility Library Documentation
 
-This library provides simplified functions for interacting with AWS DynamoDB tables. The documented functions allow searching for records with specific conditions, retrieving batches of items using primary keys, inserting records, and updating or deleting data.
+This library provides simplified functions for interacting with AWS DynamoDB tables. The documented functions allow searching for records with specific conditions, retrieving batches of items using primary keys, inserting records, updating or deleting data, and increasing specific field values.
 
 ## Table of Contents
 
@@ -9,6 +9,10 @@ This library provides simplified functions for interacting with AWS DynamoDB tab
     - [dynamo_search](#dynamo_search)
     - [dynamo_counter](#dynamo_counter)
     - [batch_get_items](#batch_get_items)
+    - [dynamo_create](#dynamo_create)
+    - [dynamo_update](#dynamo_update)
+    - [dynamo_increase](#dynamo_increase)
+    - [dynamo_delete](#dynamo_delete)
 - **[Helpers](#helpers)**
     - [DynamoComparison](#dynamocomparison)
 - **[Logging](#logging)**
@@ -18,22 +22,28 @@ This library provides simplified functions for interacting with AWS DynamoDB tab
 
 ## Imports
 ```python
-from ddb_client import (
-    # Searches
+# Search Module
+from ddb_client.searches import (
     dynamo_search,
     batch_get_items,
-    dynamo_counter,
-    # Updates
+    dynamo_counter
+)
+
+# Update Module
+from ddb_client.updates import (
     dynamo_update,
-    dynamo_create
+    dynamo_create,
+    dynamo_increase,
+    dynamo_delete
 )
 ```
+
 
 ## Functions
 
 ### dynamo_search
 
-The `dynamo_search` function allows searching for records in a DynamoDB table using specific key conditions and optional filters. 
+The `dynamo_search` function allows searching for records in a DynamoDB table using specific key conditions and optional filters.
 > [!NOTE]
 > The dynamo_search function *[Support helpers](#helpers)* for Sort Keys and FilterExpressions
 
@@ -97,7 +107,7 @@ print(result)
 
 ### dynamo_counter
 
-The `dynamo_counter` function counts the total number of items that meet certain conditions in a DynamoDB table. 
+The `dynamo_counter` function counts the total number of items that meet certain conditions in a DynamoDB table.
 > [!NOTE]
 > The dynamo_counter function *[Support helpers](#helpers)* only for FilterExpressions
 
@@ -177,6 +187,165 @@ print(items)
 #### Details
 
 `batch_get_items` uses DynamoDB's `batch_get_item` API to fetch items based on primary keys. The function handles batches of up to 100 items per call, managing unprocessed keys to ensure all items are retrieved.
+
+### dynamo_create
+
+The `dynamo_create` function allows inserting a new item into a DynamoDB table.
+
+#### Function Definition
+
+```python
+def dynamo_create(table, data):
+    ...
+```
+
+#### Parameters
+
+- **table** *(str)*: Name of the DynamoDB table.
+- **data** *(dict)*: Dictionary containing the item attributes and values to be inserted.
+
+#### Return
+A dictionary with the structure:
+
+```js
+{
+    "data": {},          // The inserted item.
+    "status": true|false // Status of the operation.
+}
+```
+
+#### Usage Example
+
+```python
+data = {
+    'name': 'New Item',
+    'description': 'A new item to add to the table'
+}
+
+result = dynamo_create('bas_portfolio', data)
+print(result)
+```
+
+### dynamo_update
+
+The `dynamo_update` function allows updating attributes of an existing item in a DynamoDB table.
+
+#### Function Definition
+
+```python
+def dynamo_update(table, keys, data, **conditions):
+    ...
+```
+
+#### Parameters
+
+- **table** *(str)*: Name of the DynamoDB table.
+- **keys** *(dict)*: Dictionary specifying the primary key(s) of the item to update.
+- **data** *(dict)*: Dictionary containing the attributes to be updated and their new values.
+- **conditions** *(optional)*: Additional conditions that must be met for the update to proceed.
+
+#### Return
+A dictionary with the structure:
+
+```js
+{
+    "status": true|false,  // Status of the operation.
+    "row_count": 0|1       // Number of rows affected by the operation.
+}
+```
+
+#### Usage Example
+
+```python
+params = {
+    'id': 'item1'
+}
+data = {
+    'description': 'Updated description'
+}
+
+result = dynamo_update('bas_portfolio', params, data)
+print(result)
+```
+
+### dynamo_increase
+
+The `dynamo_increase` function allows incrementing numerical values of specific attributes of an item in a DynamoDB table.
+
+#### Function Definition
+
+```python
+def dynamo_increase(table, params, data):
+    ...
+```
+
+#### Parameters
+
+- **table** *(str)*: Name of the DynamoDB table.
+- **params** *(dict)*: Dictionary specifying the primary key(s) of the item to update.
+- **data** *(dict)*: Dictionary containing the attributes to be incremented and the increment values.
+
+#### Return
+A dictionary with the structure:
+
+```js
+{
+    "status": true|false,  // Status of the operation.
+    "row_count": 0|1       // Number of rows affected by the operation.
+}
+```
+
+#### Usage Example
+
+```python
+params = {
+    'id': 'item1'
+}
+data = {
+    'count': 5
+}
+
+result = dynamo_increase('bas_portfolio', params, data)
+print(result)
+```
+
+### dynamo_delete
+
+The `dynamo_delete` function allows deleting an existing item from a DynamoDB table.
+
+#### Function Definition
+
+```python
+def dynamo_delete(table, params, **args):
+    ...
+```
+
+#### Parameters
+
+- **table** *(str)*: Name of the DynamoDB table.
+- **params** *(dict)*: Dictionary specifying the primary key(s) of the item to delete.
+- **args** *(optional)*: Additional options such as `return_values`.
+
+#### Return
+A dictionary with the structure:
+
+```js
+{
+    "status": true|false,  // Status of the operation.
+    "row_count": 0|1       // Number of rows affected by the operation.
+}
+```
+
+#### Usage Example
+
+```python
+params = {
+    'id': 'item1'
+}
+
+result = dynamo_delete('bas_portfolio', params)
+print(result)
+```
 
 ---
 
@@ -296,3 +465,5 @@ print(result)
 
 - `batch_get_items` is limited to retrieving a maximum of 100 items per batch due to DynamoDB restrictions.
 - `dynamo_search` supports searches based on primary and sort keys; more complex queries may require additional customization.
+- `dynamo_create`, `dynamo_update`, `dynamo_increase`, and `dynamo_delete` functions rely on proper schema definition and allowed fields configurations, which must be set up appropriately to avoid runtime issues.
+
