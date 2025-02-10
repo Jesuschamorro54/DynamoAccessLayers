@@ -6,13 +6,15 @@ This library provides simplified functions for interacting with AWS DynamoDB tab
 
 - **[Imports](#imports)**
 - **[Functions](#functions)**
-    - [dynamo_search](#dynamo_search)
-    - [dynamo_counter](#dynamo_counter)
-    - [batch_get_items](#batch_get_items)
-    - [dynamo_create](#dynamo_create)
-    - [dynamo_update](#dynamo_update)
-    - [dynamo_increase](#dynamo_increase)
-    - [dynamo_delete](#dynamo_delete)
+    - [Searches Module](#searches-module)
+        - [dynamo_search](#dynamo_search)
+        - [dynamo_counter](#dynamo_counter)
+        - [batch_get_items](#batch_get_items)
+    - [Updates Module](#searches-module)
+        - [dynamo_create](#dynamo_create)
+        - [dynamo_update](#dynamo_update)
+        - [dynamo_increase](#dynamo_increase)
+        - [dynamo_delete](#dynamo_delete)
 - **[Helpers](#helpers)**
     - [DynamoComparison](#dynamocomparison)
 - **[Logging](#logging)**
@@ -41,11 +43,14 @@ from ddb_client.updates import (
 
 ## Functions
 
+## Searches Module
+
 ### dynamo_search
 
 The `dynamo_search` function allows searching for records in a DynamoDB table using specific key conditions and optional filters.
-> [!NOTE]
+> 
 > The dynamo_search function *[Support helpers](#helpers)* for Sort Keys and FilterExpressions
+> Please note the minimum configuration in the *[config.py](#helpers)* file to use this module
 
 #### Function Definition
 
@@ -66,6 +71,9 @@ def dynamo_search(table, params, limit=False, **args):
   - **order** *(str, optional)*: Query order (`ASC` or `DESC`). Default: `ASC`.
   - **order_by** *(str, optional)*: Key by which the query is organized, typically a local secondary index (LSI).
   - **pages** *(int, optional)*: Number of items per page, default value in `config.py`.
+  - **log_qparams** *(bool, optional)*: Displays the query that was built to perform the query. Default: `False`
+  - **log_schema** *(bool, optional)*: Displays the schema of table which will be used to perform the query. Default: `False`
+
 
 #### Return
 
@@ -81,6 +89,7 @@ A dictionary with the structure:
 
 #### Usage Examples
 
+Common
 ```python
 params = {
     'curso_id': '1234',
@@ -91,6 +100,7 @@ result = dynamo_search('bas_certifications', params)
 print(result)
 ```
 
+Specific fields
 ```python
 params = {
     'user_id': '425034',
@@ -98,6 +108,19 @@ params = {
 }
 
 result = dynamo_search('bas_certifications', params, limit=True, order_by='user_date')
+print(result)
+```
+
+Filters or [Helpers](#helpers)
+```python
+from ddb_client.helpers import DynamoComparison as dynamo_cmp
+
+params = {
+    'user_id': '425034',
+    'estado': dynamo_cmp.Ne(-1)  # All certifications active
+}
+
+result = dynamo_search('bas_certifications', params, limit=True)
 print(result)
 ```
 
@@ -173,7 +196,7 @@ def batch_get_items(table, source, **keys_fields):
 A list of items retrieved from the table.
 
 #### Usage Example
-
+With only Primary key
 ```python
 source = [
     {'id': 'value1', 'date': 'value2', 'user_id': 'value3'},
@@ -181,12 +204,20 @@ source = [
 ]
 
 items = batch_get_items('bas_users', source, user_id='user_id')
-print(items)
+```
+With Primary key and Sort key
+```python
+attempts = [
+    {'id': 'value1', 'course_id': '4350', 'user_id': '425034'},
+    {'id': 'value2', 'course_id': '4467', 'user_id': '568745'}
+]
+#                                                       Primary key        Sort key
+items = batch_get_items('bas_certifications', attempts, user_id='user_id', curso_id='course_id')
 ```
 
 #### Details
 
-`batch_get_items` uses DynamoDB's `batch_get_item` API to fetch items based on primary keys. The function handles batches of up to 100 items per call, managing unprocessed keys to ensure all items are retrieved.
+`batch_get_items` uses DynamoDB's `batch_get_item` API to fetch items based **ONLY on primary keys**. The function handles batches of up to 100 items per call, managing unprocessed keys to ensure all items are retrieved.
 
 ### dynamo_create
 
@@ -213,6 +244,9 @@ A dictionary with the structure:
     "status": true|false // Status of the operation.
 }
 ```
+
+> [!NOTE]
+> The dynamo_create function added  Automatically add `create_at (utc iso format)`, `id (uuid)`, and `timestamp (number)` fields to records, only if they are not submitted. If the data source contains these attributes, ignore the default ones.
 
 #### Usage Example
 
@@ -243,6 +277,10 @@ def dynamo_update(table, keys, data, **conditions):
 - **keys** *(dict)*: Dictionary specifying the primary key(s) of the item to update.
 - **data** *(dict)*: Dictionary containing the attributes to be updated and their new values.
 - **conditions** *(optional)*: Additional conditions that must be met for the update to proceed.
+    - **log_criticals**: *(optional)*: Default `True`
+    - **log_qparams**: *(optional)*: Default `False`
+    - **log_schema**: *(optional)*: Default `False`
+    - **log_keys**: *(optional)*: Default `False`
 
 #### Return
 A dictionary with the structure:
@@ -257,15 +295,10 @@ A dictionary with the structure:
 #### Usage Example
 
 ```python
-params = {
-    'id': 'item1'
-}
-data = {
-    'description': 'Updated description'
-}
+params = { 'id': 'item1' }
+data = { 'description': 'Updated description' }
 
 result = dynamo_update('bas_portfolio', params, data)
-print(result)
 ```
 
 ### dynamo_increase
@@ -298,15 +331,10 @@ A dictionary with the structure:
 #### Usage Example
 
 ```python
-params = {
-    'id': 'item1'
-}
-data = {
-    'count': 5
-}
+params = { 'id': 'item1' }
+data = { 'score': 2 } # To the current value I need to add 2 now
 
-result = dynamo_increase('bas_portfolio', params, data)
-print(result)
+result = dynamo_increase('bas_certifications_statistics', params, data)
 ```
 
 ### dynamo_delete
@@ -339,12 +367,9 @@ A dictionary with the structure:
 #### Usage Example
 
 ```python
-params = {
-    'id': 'item1'
-}
+params = { 'id': 'item1' }
 
 result = dynamo_delete('bas_portfolio', params)
-print(result)
 ```
 
 ---
@@ -448,13 +473,71 @@ print(result)
 > [!NOTE]  
 > The `is_key` parameter indicates whether it is a table key and should be constructed with the `Key` class instead of `Attr`.
 
----
 
-## Logging
+## Configurations
+### Searches module cofiguration
+```python
+# config.py
 
-- In `batch_get_items`, use `logger_keys` and `logger_result` to log the keys and retrieved results.
-- In `dynamo_search`, use `log_qparams` to log the constructed `qparams`.
-- Errors during execution are logged with detailed information about the issue.
+paginate = True # Required
+page = False    # Required
+
+
+# Value allowed to assign (Gets all fields from the table you want to query)
+fields = {} 
+
+# Else you can specify the fields
+fields = {
+    'table1': [
+        'field1',
+        'field2',
+        'field3',
+        'field4',
+    ],
+
+    'table2': [
+        'field1',
+        'field2',
+        'field3',
+        'field4',
+    ]
+}
+```
+
+### Searches module cofiguration
+```python
+# config.py
+
+
+# Value allowed to assign
+allowed_fields = {} 
+
+# Else you can specify the fields
+allowed_fields = {
+    'table2': [
+        'field1',
+        'field1.sub_field1',
+        'field1.sub_field2',
+        'field2',
+        'field3',
+    ]
+}
+
+
+
+defaults = {
+    'table1': {
+        'field1': 'value1'
+        'field2': 'value2'
+        'field3': 'value3'
+        'field4': 'value4'
+    },
+
+    'table2': { } # REQUIRED! Is a valid value when dont have default values
+}
+```
+
+
 
 ## Additional Considerations
 
