@@ -5,11 +5,11 @@ This library provides simplified functions for interacting with AWS DynamoDB tab
 ## Table of Contents
 - **[ddb_client](#ddb_client-dynamodb-utility-framework)**
     - *[Imports](#imports)*
-    - [Searches Module](#-ddb_clientsearches-search-and-query-module)
+    - **[Searches Module](#-ddb_clientsearches-search-and-query-module)**
         - [dynamo_search](#dynamo_search)
         - [dynamo_counter](#dynamo_counter)
         - [batch_get_items](#batch_get_items)
-    - [Updates Module](#-ddb_clientupdates-update-and-modification-module)
+    - **[Updates Module](#-ddb_clientupdates-update-and-modification-module)**
         - [dynamo_create](#dynamo_create)
         - [batch_create_items](#batch_create_items)
         - [dynamo_update](#dynamo_update)
@@ -20,6 +20,13 @@ This library provides simplified functions for interacting with AWS DynamoDB tab
         - [DynamoComparison](#dynamocomparison)
     - **[Additional Considerations](#additional-considerations)**
     - **[Limitations](#limitations)**
+
+- **[aws_client](#aws_client-aws-services-interaction-module)**
+    - *[Imports](#imports-1)*
+    - **Aws Lambda**
+        - **[invoke_event_bus](#invoke_event_bus)**
+        - **[invoke_lambda](#invoke_lambda)**
+        - **[get_lambda_metadata](#get_lambda_metadata)**
 
 
 # ddb_client: DynamoDB Utility Framework
@@ -186,7 +193,7 @@ def dynamo_counter(table, params, **args):
 
 A dictionary with the structure:
 
-```json
+```js
 {
     "Count_Items": 0,  // Total number of items meeting the conditions.
     "Pages": 0         // Total number of pages, considering pagination settings.
@@ -309,7 +316,7 @@ def dynamo_create(table, data, **args):
 #### Return
 A dictionary with the structure:
 
-```json
+```js
 {
     "data": {},          // The inserted item.
     "status": true | false // Status of the operation.
@@ -352,7 +359,7 @@ def batch_create_items(table, source, **args):
 
 ## Return
 
-```json
+```js
 {
     "status": true | false,  // Status of the operation.
     "row_count": 0 | N       // Number of rows inserted.
@@ -407,7 +414,7 @@ def dynamo_update(table, keys, data, **args):
 #### Return
 A dictionary with the structure:
 
-```json
+```js
 {
     "status": true | false,  // Status of the operation.
     "row_count": 0 | 1       // Number of rows affected by the operation.
@@ -448,7 +455,7 @@ def dynamo_increase(table, params, data, **args):
 ## Return
 A dictionary with the structure:
 
-```json
+```js
 {
     "status": true | false,  // Status of the operation.
     "row_count": 0 | 1       // Number of rows affected by the operation.
@@ -510,7 +517,7 @@ def dynamo_delete(table, params, **args):
 #### Return
 A dictionary with the structure:
 
-```json
+```js
 {
     "status": true | false,  // Status of the operation.
     "row_count": 0 | 1       // Number of rows affected by the operation.
@@ -549,7 +556,7 @@ def batch_delete_items(table, source, **args):
 ## Return
 A dictionary with the structure:
 
-```json
+```js
 {
     "status": true | false,  // Status of the operation.
     "row_count": 0 | N       // Number of rows deleted.
@@ -744,7 +751,6 @@ defaults = {
 ```
 
 
-
 ## Additional Considerations
 
 - Keep in mind DynamoDB's pricing model, as read capacity units (RCU) and write capacity units (WCU) are consumed based on read consistency and the number of operations.
@@ -755,4 +761,196 @@ defaults = {
 - `batch operations` is limited to retrieving a maximum of 100 for query or 25 for update items per batch due to DynamoDB restrictions.
 - `dynamo_search` supports searches based on primary and sort keys; more complex queries may require additional customization.
 - `dynamo_create`, `dynamo_update`, `dynamo_increase`, and `dynamo_delete` functions rely on proper schema definition and allowed fields configurations, which must be set up appropriately to avoid runtime issues.
+
+___
+
+# aws_client: AWS Services Interaction Module
+
+The `aws_client` module provides utility functions to interact with various AWS services, particularly **AWS Lambda** and **AWS EventBridge**. It abstracts complex interactions with AWS SDK, enabling efficient event-driven execution and inter-service communication.
+
+## Features
+- **Lambda Invocation**: Invoke AWS Lambda functions synchronously or asynchronously.
+- **EventBridge Integration**: Send structured events to an AWS EventBridge event bus.
+- **Lambda Metadata Extraction**: Retrieve runtime metadata about the executing Lambda function.
+- **Logging & Debugging**: Optional logging for better monitoring and debugging.
+
+## Usage
+This module is ideal for serverless applications requiring:
+- **Lambda-to-Lambda communication**: Trigger another function with structured payloads.
+- **Event-driven workflows**: Dispatch events to AWS EventBridge for downstream processing.
+- **Context-aware processing**: Extract execution context metadata for logging or monitoring.
+
+By using `aws_client`, developers can efficiently build scalable and event-driven AWS architectures while minimizing boilerplate code.
+
+---
+
+## Imports
+```python
+
+from aws_client.aws_lambda import (
+    get_lambda_metadata,
+    invoke_event_bus,
+    invoke_lambda
+)
+
+```
+
+# get_lambda_metadata
+
+The `get_lambda_metadata` function extracts metadata from the AWS Lambda execution context.
+
+## Function Definition
+
+```python
+def get_lambda_metadata(context):
+    ...
+```
+
+## Parameters
+
+- **context** *(object)*: The AWS Lambda execution context object.
+
+## Return
+A dictionary with the structure:
+
+```js
+{
+    "FunctionName": "lambda-name",
+    "Alias": "alias",
+    "Version": "version",
+    "Memory": 128, # Mb
+    "Arn": "arn:aws:lambda:region:account-id:function:function-name",
+    "RequestId": "request-id"
+}
+```
+
+## Usage Example
+
+```python
+# Import from aws_client
+from aws_client.aws_lambda import get_lambda_metadata
+
+
+def lambda_handler(event, context):
+    
+    metadata = get_lambda_metadata(context)
+    print(metadata)
+```
+----
+
+# invoke_event_bus
+
+The `invoke_event_bus` function sends an event to an AWS EventBridge event bus.
+
+## Function Definition
+
+```python
+def invoke_event_bus(EventBusName, Source, payload, DetailType, lambda_details, JSONSTRINGIFY=True, log_enabled=False):
+    ...
+```
+
+## Parameters
+
+- **EventBusName** *(str)*: Name of the EventBridge event bus.
+- **Source** *(str)*: Source identifier of the event.
+- **payload** *(dict)*: Event payload data.
+- **DetailType** *(str)*: Description of the event type.
+- **lambda_details** *(dict)*: Metadata about the Lambda function sending the event.
+- **JSONSTRINGIFY** *(bool, optional)*: Whether to JSON stringify the event body. Default is `True`.
+- **log_enabled** *(bool, optional)*: Whether to enable logging. Default is `False`.
+
+## Return
+A dictionary with the structure:
+
+```js
+{
+    "status": true | false,  // Status of the operation.
+    "FailedEntryCount": 0 | N  // Number of failed event entries.
+}
+```
+
+## Usage Example
+
+```python
+# Import
+from aws_client.aws_lambda import invoke_event_bus
+
+def lambda_handler(event, context):
+
+    lambda_metadata = get_lambda_metadata(context)
+
+    payload = {
+        "user_id": "12345",
+        "action": "purchase"
+    }
+
+    result = invoke_event_bus("my-event-bus", "my.service", payload, "UserAction", lambda_metadata)
+    print(result)
+
+```
+
+### Event structure
+
+```python
+{
+    "EventBridgeTracer": "EventBridge:{EventBusName}:Source:{Source}:DetailType:{DetailType}:LambdaOrigin:{FunctionName}",
+    "timeEpoch": int,
+    "origin": {
+        "resource": "Lambda",
+        "arn": lambda['Arn'],
+        "version": lambda['Version'],
+        "alias": lambda['Alias'],
+        "RequestId": lambda['RequestId'],
+        "FunctionName": lambda['FunctionName']
+    },
+    "LambdaOriginEvent": payload.pop('lambda_event', {}),
+    "authorizer": payload.pop('authorizer', {}),
+    "params": payload.pop("params", {}),
+    "body": json.dumps({"data": payload}) if JSONSTRINGIFY else { "data": payload }
+}
+```
+
+---
+
+# invoke_lambda
+
+The `invoke_lambda` function invokes another AWS Lambda function asynchronously or synchronously.
+
+## Function Definition
+
+```python
+def invoke_lambda(lambda_name, payload, invocation_type="Event", qualifier='develop', log_enabled=True):
+    ...
+```
+
+## Parameters
+
+- **lambda_name** *(str)*: Name of the Lambda function to invoke.
+- **payload** *(dict)*: Data to send to the invoked Lambda function.
+- **invocation_type** *(str, optional)*: Type of invocation (`"Event"` for async, `"RequestResponse"` for sync). Default is `"Event"`.
+- **qualifier** *(str, optional)*: Alias or version of the Lambda function. Default is `'develop'`.
+- **log_enabled** *(bool, optional)*: Whether to enable logging. Default is `True`.
+
+## Return
+If invocation type is `"RequestResponse"`, returns the response object from the invoked function. Otherwise, returns an empty dictionary.
+
+## Usage Example
+
+```python
+# Import
+from aws_client.aws_lambda import invoke_lambda
+
+def lambda_handler(event, context):
+    
+    lambda_metadata = get_lambda_metadata(context)
+    lambda_alias = metadata['Alias']
+
+    payload = { "message": "Hello from another Lambda" }
+
+    result = invoke_lambda("my_target_lambda", payload, invocation_type="RequestResponse", qualifier=lambda_alias)
+    print(result)
+```
+
+---
+
 
