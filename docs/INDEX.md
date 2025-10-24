@@ -113,6 +113,23 @@ Todo lo que necesitas saber para contribuir al proyecto.
 
 ---
 
+### [Limpieza de Lambda Layers](CLEANUP_LAYERS.md)
+Guía para eliminar versiones antiguas de Lambda Layers de forma segura.
+
+**Contenido:**
+- Uso del script cleanup_layers.py
+- Verificación de uso en funciones Lambda
+- Protección de versiones recientes
+- Modo dry-run
+- Ejemplos prácticos
+- Estrategias de limpieza
+- Troubleshooting
+
+**Nivel:** Básico - Intermedio  
+**Tiempo de lectura:** ~15 minutos
+
+---
+
 ## 📋 Recursos Adicionales
 
 ### [CHANGELOG](../CHANGELOG.md)
@@ -215,6 +232,7 @@ Licencia MIT del proyecto.
 | Eventos con trazabilidad | [Ver ejemplo](AWS_CLIENT.md#patrón-de-trazabilidad) |
 | WebSocket broadcast | [Ver ejemplo](AWS_CLIENT.md#broadcast-a-múltiples-conexiones) |
 | Búsqueda full-text | [Ver ejemplo](AWS_CLIENT.md#búsqueda-simple-de-cursos) |
+| Limpieza de layers | [Ver guía](CLEANUP_LAYERS.md) |
 
 ---
 

@@ -555,6 +555,7 @@ from ddb_client.updates import (
     dynamo_create,       # Crear registro
     batch_create_items,  # Crear múltiples registros
     dynamo_update,       # Actualizar registro
+    batch_update_items,  # Actualizar múltiples registros
     dynamo_increase,     # Incrementar campos
     dynamo_delete,       # Eliminar registro
     batch_delete_items   # Eliminar múltiples registros
@@ -821,6 +822,258 @@ data = {
 
 result = dynamo_update('bas_certifications', keys, data, log_criticals=True)
 # Log: "Filtered fields not allowed: ['user_id', 'secret_field']"
+```
+
+**Eliminar campos con None**
+
+```python
+# Pasar None como valor elimina el campo del registro
+keys = {
+    'user_id': '425034',
+    'curso_id': '1234'
+}
+
+data = {
+    'score': 95,
+    'temp_token': None,      # ✅ Este campo se eliminará
+    'session_id': None       # ✅ Este campo se eliminará
+}
+
+result = dynamo_update('bas_certifications', keys, data)
+# El item ya no tendrá temp_token ni session_id
+```
+
+---
+
+### batch_update_items
+
+> ⚠️ **Nota de eficiencia:**  
+> La función `batch_update_items` **no es eficiente para grandes volúmenes** porque realiza un ciclo de:
+>
+> 1. **Batch Get:** Lee todos los registros completos antes de actualizar (requiere un batch read por cada grupo de hasta 100 items).
+> 2. **Merge en memoria:** Realiza el merge en Python, lo cual puede ser lento con muchos items o registros grandes.
+> 3. **Batch Write:** Escribe cada registro actualizado completo, incluso si solo cambian algunos campos.
+>
+> DynamoDB **no tiene batch update nativo**; por eso esta técnica hace sobrescritura total (`PutRequest`) de cada registro actualizado.  
+> - Si tienes miles de items para actualizar, usa estrategias paginadas o evalúa solicitudes puntuales de `update_item` para minimizar lecturas y escrituras.
+> - Para casos de actualización masiva de pocos campos y muchos registros, es mejor un proceso dedicado fuera de Lambda o scripts controlados.
+>
+
+
+Actualiza múltiples registros en una sola operación, combinando `batch_get` y `batch_write` para preservar campos no especificados.
+
+#### Firma
+
+```python
+def batch_update_items(
+    table: str,
+    source: list,
+    **args
+) -> dict
+```
+
+#### Parámetros
+
+| Parámetro | Tipo | Descripción | Requerido |
+|-----------|------|-------------|-----------|
+| `table` | str | Nombre de la tabla | ✅ |
+| `source` | list | Lista de items con keys + datos a actualizar | ✅ |
+| `log_keys` | bool | Log de claves procesadas | ❌ |
+| `log_result` | bool | Log de respuestas DynamoDB | ❌ |
+| `log_merge` | bool | Log del merge de datos | ❌ |
+| `return_items` | bool | Retornar items actualizados | ❌ |
+
+#### Retorno
+
+```python
+{
+    "status": True,       # True si fue exitoso
+    "row_count": 10,      # Número de registros actualizados
+    "items": [...]        # Items actualizados (si return_items=True)
+}
+```
+
+#### Cómo Funciona
+
+Esta función implementa una estrategia de "merge inteligente" en 4 pasos:
+
+1. **Extracción de Keys**: Detecta automáticamente PK y SK del schema, extrae las keys de cada item
+2. **Batch Get**: Obtiene los registros completos existentes (ignora `config.fields`, trae TODOS los campos)
+3. **Merge**: Combina datos existentes con actualizaciones, preservando campos no especificados
+4. **Batch Write**: Sobrescribe items completos usando `batch_write_item`
+
+**Características especiales:**
+- ✅ **No requiere especificar mapeos** como otras funciones batch (detecta PK/SK automáticamente)
+- ✅ **Preserva campos no especificados** (solo actualiza los campos que envías)
+- ✅ **Soporta eliminación con None** (campos con valor `None` se eliminan)
+- ✅ **Valida items duplicados** y advierte sobre items no encontrados
+
+#### Ejemplos
+
+**Actualización básica**
+
+```python
+updates = [
+    {
+        'user_id': '425034',      # PK (detectada automáticamente)
+        'curso_id': '1234',       # SK (detectada automáticamente)
+        'last_online': '2025-01-15 10:30:00',
+        'score': 95
+    },
+    {
+        'user_id': '425034',
+        'curso_id': '5678',
+        'last_online': '2025-01-15 11:00:00',
+        'progress': 75
+    }
+]
+
+result = batch_update_items('bas_certifications', updates)
+print(f"Actualizados: {result['row_count']} registros")
+```
+
+**Con eliminación de campos**
+
+```python
+# Eliminar campos temporales de múltiples usuarios
+updates = [
+    {
+        'user_id': '425034',
+        'curso_id': '1234',
+        'temp_token': None,       # Se eliminará
+        'session_id': None,       # Se eliminará
+        'last_login': '2025-01-15'
+    },
+    {
+        'user_id': '568745',
+        'curso_id': '1234',
+        'temp_field': None,       # Se eliminará
+        'score': 100
+    }
+]
+
+result = batch_update_items('bas_certifications', updates)
+```
+
+**Con logs para debugging**
+
+```python
+result = batch_update_items(
+    'bas_certifications',
+    updates,
+    log_keys=True,      # Ver keys extraídas
+    log_result=True,    # Ver respuestas DynamoDB
+    log_merge=True      # Ver merge de cada item
+)
+
+# Output logs:
+# INFO: Keys to fetch: [{'user_id': '425034', 'curso_id': '1234'}, ...]
+# INFO: Fetched 2 existing items
+# INFO: Merged item for key (425034, 1234) -> Result: {...}
+# INFO: Successfully updated 2 items in table 'bas_certifications'
+```
+
+**Retornar items actualizados**
+
+```python
+result = batch_update_items(
+    'bas_certifications',
+    updates,
+    return_items=True  # Incluir items en la respuesta
+)
+
+if result['status']:
+    for item in result['items']:
+        print(f"Updated: {item['user_id']} - {item['curso_id']}")
+```
+
+**Actualización masiva desde API externa**
+
+```python
+# Sincronizar datos desde sistema externo
+external_data = [
+    {'user_id': '123', 'curso_id': '456', 'external_score': 95},
+    {'user_id': '123', 'curso_id': '789', 'external_score': 88},
+    # ... más registros
+]
+
+# Actualizar preservando campos locales
+result = batch_update_items('bas_certifications', external_data)
+# Los campos como 'created_at', 'attempts', etc. se preservan
+```
+
+#### Comparación con Alternativas
+
+| Característica | `batch_update_items` | Loop con `dynamo_update` | `batch_write_item` directo |
+|----------------|---------------------|-------------------------|---------------------------|
+| **Preserva campos no especificados** | ✅ Automático | ✅ Con UpdateExpression | ❌ Sobrescribe todo |
+| **Operaciones por llamada** | 2 (get + write) | N (una por item) | 1 (solo write) |
+| **Detecta PK/SK automático** | ✅ Sí | ⚠️ Manual | ⚠️ Manual |
+| **Elimina campos con None** | ✅ Sí | ✅ Sí (REMOVE) | ❌ No |
+| **Límite de items** | 100 get + 25 write | Ilimitado | 25 |
+| **Performance** | ⚠️ 2 operaciones | ❌ N operaciones | ✅ 1 operación |
+| **Costo RCU/WCU** | Alto (lee todo) | Bajo (solo update) | Medio |
+
+#### Casos de Uso Ideales
+
+**✅ Cuando usar `batch_update_items`:**
+- Actualizar múltiples registros con campos parciales
+- Sincronizar datos desde fuentes externas
+- Limpiar campos temporales de múltiples registros
+- Necesitas preservar campos existentes no especificados
+
+**❌ Cuando NO usar `batch_update_items`:**
+- Crear nuevos registros (usa `batch_create_items`)
+- Actualizar UN solo registro (usa `dynamo_update`)
+- Actualizar campos muy específicos sin leer el resto (usa `dynamo_update`)
+- Necesitas actualizaciones condicionales (usa `dynamo_update`)
+
+#### Límites y Consideraciones
+
+- **Límite Batch Get**: Máximo 100 items por batch (automáticamente dividido)
+- **Límite Batch Write**: Máximo 25 items por batch (automáticamente dividido)
+- **Items no encontrados**: Advierte en logs, no crea registros nuevos
+- **Costo**: Consume RCU para leer + WCU para escribir (más costoso que `UpdateItem`)
+- **No condicional**: No soporta `ConditionExpression`, sobrescribe sin validaciones
+- **Manejo automático**: Procesa `UnprocessedKeys` y `UnprocessedItems` automáticamente
+
+#### Ejemplo Completo de Flujo
+
+```python
+# Estado inicial en DynamoDB
+# {
+#   'user_id': '425034',
+#   'curso_id': '1234',
+#   'name': 'John Doe',
+#   'email': 'john@test.com',
+#   'score': 80,
+#   'attempts': 3,
+#   'created_at': '2024-01-01T00:00:00Z'
+# }
+
+# Actualización enviada
+updates = [
+    {
+        'user_id': '425034',
+        'curso_id': '1234',
+        'score': 95,                # Actualizar
+        'last_online': '2025-01-15' # Agregar nuevo campo
+    }
+]
+
+result = batch_update_items('bas_certifications', updates)
+
+# Estado final en DynamoDB (merge automático)
+# {
+#   'user_id': '425034',
+#   'curso_id': '1234',
+#   'name': 'John Doe',           # ✅ Preservado
+#   'email': 'john@test.com',     # ✅ Preservado
+#   'score': 95,                  # ✅ Actualizado
+#   'attempts': 3,                # ✅ Preservado
+#   'created_at': '2024-01-01T00:00:00Z', # ✅ Preservado
+#   'last_online': '2025-01-15'   # ✅ Nuevo campo agregado
+# }
 ```
 
 ---

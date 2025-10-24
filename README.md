@@ -230,6 +230,7 @@ from ddb_client.updates import (
     dynamo_create,       # Crear registro
     batch_create_items,  # Crear múltiples registros
     dynamo_update,       # Actualizar registro
+    batch_update_items,  # Actualizar múltiples registros
     dynamo_increase,     # Incrementar campos numéricos
     dynamo_delete,       # Eliminar registro
     batch_delete_items   # Eliminar múltiples registros
@@ -386,6 +387,23 @@ python deploy.py --env production --message "Descripción del cambio"
 python deploy.py --env develop --verbose
 ```
 
+### Limpieza de Versiones Antiguas
+
+El script `cleanup_layers.py` permite eliminar versiones antiguas de forma segura:
+
+```bash
+# Listar todas las versiones
+python3 cleanup_layers.py --env develop --list
+
+# Eliminar versiones específicas
+python3 cleanup_layers.py --env develop --versions "1-10"
+
+# Simular eliminación (dry-run)
+python3 cleanup_layers.py --env develop --versions "1-20" --dry-run
+```
+
+**[📖 Ver documentación completa de cleanup](docs/CLEANUP_LAYERS.md)**
+
 ### Estructura del deployment
 
 El script `deploy.py`:
@@ -440,7 +458,7 @@ if 'LastEvaluatedKey' in result:
 ### Operaciones batch
 
 ```python
-from ddb_client.updates import batch_create_items, batch_delete_items
+from ddb_client.updates import batch_create_items, batch_update_items, batch_delete_items
 
 # Crear múltiples registros
 items = [
@@ -452,6 +470,26 @@ items = [
 result = batch_create_items('bas_certifications', items, user_id='user_id', curso_id='curso_id')
 print(f"Creados: {result['row_count']} registros")
 
+# Actualizar múltiples registros
+updates = [
+    {
+        'user_id': '123',        # PK
+        'curso_id': '456',       # SK
+        'last_online': '2025-01-15 10:30:00',
+        'score': 95
+    },
+    {
+        'user_id': '123',
+        'curso_id': '789',
+        'last_online': '2025-01-15 11:00:00',
+        'progress': 75,
+        'temp_field': None  # Este campo se eliminará
+    }
+]
+
+result = batch_update_items('bas_certifications', updates, log_merge=True)
+print(f"Actualizados: {result['row_count']} registros")
+
 # Eliminar múltiples registros
 to_delete = [
     {'user_id': '123', 'curso_id': '456'},
@@ -461,6 +499,14 @@ to_delete = [
 result = batch_delete_items('bas_certifications', to_delete, user_id='user_id', curso_id='curso_id')
 print(f"Eliminados: {result['row_count']} registros")
 ```
+
+**Nota sobre `batch_update_items`:**
+- No requiere especificar los parámetros `user_id` o `curso_id` como en las otras funciones batch
+- Automáticamente detecta PK y SK del schema de la tabla
+- Hace `batch_get` para traer todos los campos actuales
+- Hace merge de datos existentes con los nuevos
+- Soporta eliminación de campos usando `None`
+- Ideal para actualizar múltiples registros preservando campos no especificados
 
 ### Incrementos con límites
 
