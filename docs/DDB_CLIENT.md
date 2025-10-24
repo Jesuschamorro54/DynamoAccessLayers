@@ -800,10 +800,10 @@ result = dynamo_update(
 
 ```python
 # config.py debe incluir el campo anidado en allowed_fields
-# allowed_fields['table'] = ['metadata.course_data']
+# allowed_fields['table'] = ['metadata.progress', 'metadata.last_lesson']
 
 data = {
-    'metadata.course_data': {'progress': 75, 'last_lesson': 10}
+    'metadata': {'progress': 75, 'last_lesson': 10}
 }
 
 result = dynamo_update('bas_certifications', keys, data)
