@@ -1,662 +1,213 @@
-# AWS Edutin Layer
+# MySQL Client Layer (Python 3.12 / x86_64 + arm64)
 
-[![Python Version](https://img.shields.io/badge/python-3.10%20|%203.11%20|%203.12-blue.svg)](https://www.python.org/downloads/)
-[![AWS Lambda](https://img.shields.io/badge/AWS-Lambda%20Layer-orange.svg)](https://aws.amazon.com/lambda/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+Cliente MySQL pensado para usarse como AWS Lambda Layer. Incluye helpers CRUD y utilidades seguras y simples para consultar, insertar, actualizar, eliminar e incrementar campos.
 
-> **Capa de AWS Lambda profesional para simplificar las interacciones con DynamoDB, OpenSearch y otros servicios de AWS en el ecosistema Edutin.**
-
-## 📋 Tabla de Contenidos
-
-- [Descripción](#descripción)
-- [Características](#características)
-- [Arquitectura](#arquitectura)
-- [Instalación](#instalación)
-- [Inicio Rápido](#inicio-rápido)
-- [Módulos](#módulos)
-  - [ddb_client](#ddb_client)
-  - [aws_client](#aws_client)
-  - [utils](#utils)
-- [Configuración](#configuración)
-- [Deployment](#deployment)
-- [Ejemplos de Uso](#ejemplos-de-uso)
-- [Mejores Prácticas](#mejores-prácticas)
-- [Contribución](#contribución)
-- [Licencia](#licencia)
-
-## 🎯 Descripción
-
-**AWS Edutin Layer** es una capa de Lambda altamente optimizada diseñada para simplificar y estandarizar las operaciones con servicios AWS en proyectos de Edutin. Esta capa proporciona abstracciones de alto nivel que reducen la complejidad del código y mejoran la mantenibilidad de las funciones Lambda.
-
-### ¿Por qué usar esta capa?
-
-- ✅ **Abstracción simplificada**: Operaciones complejas de DynamoDB y OpenSearch reducidas a simples llamadas de función
-- ✅ **Validación integrada**: Validación automática de esquemas y tipos de datos
-- ✅ **Logging estructurado**: Sistema de logs consistente y trazable
-- ✅ **Optimización de rendimiento**: Operaciones batch y manejo eficiente de recursos
-- ✅ **Manejo de errores robusto**: Gestión centralizada de excepciones y reintentos
-- ✅ **Type hints completos**: Documentación y autocompletado en IDEs modernos
-
-## ✨ Características
-
-### DynamoDB Client (`ddb_client`)
-
-- **Búsquedas avanzadas**: Queries con filtros, ordenamiento y paginación
-- **Operaciones batch**: Inserción y eliminación masiva optimizada
-- **Actualizaciones incrementales**: Contadores atómicos con límites min/max
-- **Helpers de comparación**: Operadores lógicos (OR, AND) y comparadores dinámicos
-- **Validación de esquemas**: Verificación automática contra esquemas definidos
-
-### AWS Client (`aws_client`)
-
-- **Lambda Functions**: Invocación de funciones, gestión de metadata
-- **EventBridge**: Envío de eventos estructurados
-- **WebSocket API**: Comunicación en tiempo real con clientes
-- **OpenSearch**: CRUD completo, búsquedas full-text, índices optimizados
-- **Normalización de texto**: Procesamiento de texto con soporte para español
-
-### Utilidades (`utils`)
-
-- **Logger runtime**: Captura automática de contexto de ejecución
-- **Structured logging**: Logs JSON con contexto completo
-
-## 🏗️ Arquitectura
-
-```
-aws_edutin_layer/
-├── python/
-│   └── python/
-│       ├── ddb_client/          # Cliente DynamoDB
-│       │   ├── __init__.py
-│       │   ├── config.py        # Configuración de tablas
-│       │   ├── constants.py     # Palabras reservadas DynamoDB
-│       │   ├── searches.py      # Operaciones de búsqueda
-│       │   ├── updates.py       # Operaciones de escritura
-│       │   ├── helpers.py       # Helpers de comparación
-│       │   └── utils.py         # Utilidades internas
-│       │
-│       ├── aws_client/          # Cliente AWS Services
-│       │   ├── aws_lambda.py    # Lambda & EventBridge
-│       │   └── open_search/     # OpenSearch operations
-│       │       ├── __init__.py
-│       │       ├── open_search_module.py  # Cliente base
-│       │       ├── op_searches.py         # Búsquedas
-│       │       ├── op_updates.py          # CRUD operations
-│       │       └── op_querys.py           # Query builders
-│       │
-│       └── utils/               # Utilidades generales
-│           └── logs.py          # Sistema de logging
-│
-├── deploy.py                    # Script de deployment
-├── messages.py                  # Mensajes de deployment
-└── README.md                    # Este archivo
-```
-
-## 📦 Instalación
-
-### Como Lambda Layer
-
-Esta capa está diseñada para ser desplegada como una AWS Lambda Layer:
-
-```bash
-# Clonar el repositorio
-git clone <repository-url>
-cd aws_edutin_layer
-
-# Desplegar a desarrollo
-python deploy.py --env develop
-
-# Desplegar a producción (requiere rama master)
-python deploy.py --env production --message "Descripción del cambio"
-```
-
-### Para desarrollo local
-
-```bash
-# Instalar dependencias
-pip install -r requirements.txt
-
-# O usar el código directamente
-export PYTHONPATH="${PYTHONPATH}:/ruta/al/proyecto/python"
-```
-
-## 🚀 Inicio Rápido
-
-### Ejemplo 1: Búsqueda en DynamoDB
-
-```python
-from ddb_client.searches import dynamo_search
-from ddb_client.helpers import DynamoComparison as dc
-
-# Búsqueda simple
-params = {
-    'user_id': '425034',
-    'curso_id': '1234'
-}
-result = dynamo_search('bas_certifications', params)
-print(f"Encontrados: {result['Count_Items']} items")
-
-# Búsqueda con filtros avanzados
-params = {
-    'user_id': '425034',
-    'estado': dc.Ne(-1),  # Estado diferente de -1
-    'score': dc.Between(100, 500)  # Score entre 100 y 500
-}
-result = dynamo_search('bas_certifications', params, limit=True)
-```
-
-### Ejemplo 2: Crear registro en DynamoDB
-
-```python
-from ddb_client.updates import dynamo_create
-
-data = {
-    'user_id': '425034',
-    'curso_id': '5678',
-    'name': 'Curso de Python',
-    'estado': 1,
-    'score': 95
-}
-
-result = dynamo_create('bas_certifications', data)
-if result['status']:
-    print(f"Registro creado: {result['data']['id']}")
-```
-
-### Ejemplo 3: Búsqueda en OpenSearch
-
-```python
-from aws_client.open_search.op_searches import op_search
-
-# Buscar cursos
-result = op_search(
-    index_name='courses',
-    query='python programming',
-    size=20
-)
-
-print(f"Total encontrados: {result['total_hits']}")
-for course in result['courses']:
-    print(f"- {course['name']} ({course['students']} estudiantes)")
-```
-
-### Ejemplo 4: Invocar otra Lambda
-
-```python
-from aws_client.aws_lambda import invoke_lambda, get_lambda_metadata
-
-def lambda_handler(event, context):
-    # Obtener metadata de la función actual
-    metadata = get_lambda_metadata(context)
-    
-    # Invocar otra función
-    payload = {
-        'action': 'process_data',
-        'data': {'user_id': '123'}
-    }
-    
-    result = invoke_lambda(
-        lambda_name='processor-function',
-        payload=payload,
-        invocation_type='RequestResponse',
-        qualifier=metadata['Alias']
-    )
-    
-    return result
-```
-
-## 📚 Módulos
-
-### ddb_client
-
-Cliente completo para operaciones con DynamoDB.
-
-#### Funciones principales
-
-##### Búsquedas
-
-```python
-from ddb_client.searches import (
-    dynamo_search,      # Búsqueda con filtros y paginación
-    dynamo_counter,     # Contador de registros
-    batch_get_items     # Obtener múltiples items por clave
-)
-```
-
-##### Actualizaciones
-
-```python
-from ddb_client.updates import (
-    dynamo_create,       # Crear registro
-    batch_create_items,  # Crear múltiples registros
-    dynamo_update,       # Actualizar registro
-    batch_update_items,  # Actualizar múltiples registros
-    dynamo_increase,     # Incrementar campos numéricos
-    dynamo_delete,       # Eliminar registro
-    batch_delete_items   # Eliminar múltiples registros
-)
-```
-
-##### Helpers
-
-```python
-from ddb_client.helpers import DynamoComparison as dc
-
-# Operadores de comparación
-dc.Eq(value)           # Igual a
-dc.Ne(value)           # Diferente de
-dc.Lt(value)           # Menor que
-dc.Le(value)           # Menor o igual
-dc.Gt(value)           # Mayor que
-dc.Ge(value)           # Mayor o igual
-dc.Between(start, end) # Entre dos valores
-dc.BeginsWith(value)   # Comienza con
-dc.Contains(value)     # Contiene
-dc.In(values)          # En lista
-dc.Null()              # Es nulo
-dc.NotNull()           # No es nulo
-
-# Operadores lógicos
-dc.Or([condition1, condition2])   # OR lógico
-dc.And([condition1, condition2])  # AND lógico
-```
-
-**[📖 Ver documentación completa de ddb_client](docs/DDB_CLIENT.md)**
-
-### aws_client
-
-Cliente para servicios AWS (Lambda, EventBridge, OpenSearch).
-
-#### Lambda & EventBridge
-
-```python
-from aws_client.aws_lambda import (
-    get_lambda_metadata,    # Obtener metadata de Lambda
-    invoke_lambda,          # Invocar otra Lambda
-    invoke_event_bus,       # Enviar evento a EventBridge
-    send_webSocket_message  # Enviar mensaje WebSocket
-)
-```
-
-#### OpenSearch
-
-```python
-from aws_client.open_search.op_searches import op_search
-from aws_client.open_search.op_updates import (
-    op_create,       # Crear documento
-    op_update,       # Actualizar documento
-    op_delete,       # Eliminar documento
-    op_bulk_create   # Crear múltiples documentos
-)
-```
-
-**[📖 Ver documentación completa de aws_client](docs/AWS_CLIENT.md)**
-
-### utils
-
-Utilidades generales para Lambda functions.
-
-```python
-from utils.logs import logger_runtime_event
-
-def lambda_handler(event, context):
-    # Log automático del evento con contexto
-    logger_runtime_event(event)
-    
-    # Tu código aquí...
-```
-
-**[📖 Ver documentación completa de utils](docs/UTILS.md)**
-
-## ⚙️ Configuración
-
-### config.py
-
-Configuración global para `ddb_client`:
-
-```python
-# config.py
-
-# Paginación
-paginate = True
-pages = 50  # Registros por página
-
-# Campos por defecto a retornar en búsquedas
-fields = {
-    'bas_certifications': [
-        'user_id',
-        'curso_id',
-        'estado',
-        'created_at'
-    ],
-    'bas_users': []  # Vacío = todos los campos
-}
-
-# Campos permitidos para actualizaciones
-allowed_fields = {
-    'bas_certifications': [
-        'estado',
-        'score',
-        'completed_at'
-    ]
-}
-
-# Valores por defecto al crear registros
-defaults = {
-    'data': {
-        'bas_certifications': {
-            'estado': 0,
-            'score': 0
-        },
-        'bas_users': {}
-    }
-}
-```
-
-### Variables de entorno
-
-Para OpenSearch, configura estas variables:
-
-```bash
-OPENSEARCH_HOST=your-opensearch-endpoint
-OPENSEARCH_PORT=9200
-OPENSEARCH_USERNAME=admin
-OPENSEARCH_PASSWORD=your-password
-OPENSEARCH_KEY_ACCESS=your-api-key
-```
-
-## 🚢 Deployment
-
-### Requisitos previos
-
-- AWS CLI configurado con credenciales
-- Python 3.10, 3.11 o 3.12
-- Git (para control de versiones)
-
-### Comandos de deployment
-
-```bash
-# Desarrollo (desde cualquier rama)
-python deploy.py --env develop
-
-# Producción (solo desde rama master)
-git checkout master
-python deploy.py --env production --message "Descripción del cambio"
-
-# Deployment con logs verbose
-python deploy.py --env develop --verbose
-```
-
-### Limpieza de Versiones Antiguas
-
-El script `cleanup_layers.py` permite eliminar versiones antiguas de forma segura:
-
-```bash
-# Listar todas las versiones
-python3 cleanup_layers.py --env develop --list
-
-# Eliminar versiones específicas
-python3 cleanup_layers.py --env develop --versions "1-10"
-
-# Simular eliminación (dry-run)
-python3 cleanup_layers.py --env develop --versions "1-20" --dry-run
-```
-
-**[📖 Ver documentación completa de cleanup](docs/CLEANUP_LAYERS.md)**
-
-### Estructura del deployment
-
-El script `deploy.py`:
-1. ✅ Valida las credenciales AWS
-2. 📦 Comprime el directorio `python/`
-3. 🚀 Publica nueva versión de la Layer
-4. ✨ Retorna la versión publicada
-
-### Configuración en Lambda
-
-Después del deployment, agrega la Layer a tus funciones:
-
-```bash
-# AWS CLI
-aws lambda update-function-configuration \
-  --function-name tu-funcion \
-  --layers arn:aws:lambda:region:account:layer:EdutinLayers:VERSION
-
-# Terraform
-resource "aws_lambda_function" "example" {
-  layers = ["arn:aws:lambda:region:account:layer:EdutinLayers:VERSION"]
-}
-```
-
-## 💡 Ejemplos de Uso
-
-### Búsqueda avanzada con paginación
-
-```python
-from ddb_client.searches import dynamo_search
-from ddb_client.helpers import DynamoComparison as dc
-
-params = {
-    'user_id': '425034',
-    'estado': dc.Or([
-        dc.Eq('active'),
-        dc.Eq('pending')
-    ]),
-    'created_at': dc.BeginsWith('2024'),
-    'fields': ['id', 'curso_id', 'estado', 'score']
-}
-
-# Primera página
-result = dynamo_search('bas_certifications', params, limit=True, pages=20)
-
-# Página siguiente
-if 'LastEvaluatedKey' in result:
-    params['LastEvaluatedKey'] = result['LastEvaluatedKey']
-    next_page = dynamo_search('bas_certifications', params, limit=True)
-```
-
-### Operaciones batch
-
-```python
-from ddb_client.updates import batch_create_items, batch_update_items, batch_delete_items
-
-# Crear múltiples registros
-items = [
-    {'user_id': '123', 'curso_id': '456', 'name': 'Item 1'},
-    {'user_id': '123', 'curso_id': '789', 'name': 'Item 2'},
-    {'user_id': '123', 'curso_id': '012', 'name': 'Item 3'}
-]
-
-result = batch_create_items('bas_certifications', items, user_id='user_id', curso_id='curso_id')
-print(f"Creados: {result['row_count']} registros")
-
-# Actualizar múltiples registros
-updates = [
-    {
-        'user_id': '123',        # PK
-        'curso_id': '456',       # SK
-        'last_online': '2025-01-15 10:30:00',
-        'score': 95
-    },
-    {
-        'user_id': '123',
-        'curso_id': '789',
-        'last_online': '2025-01-15 11:00:00',
-        'progress': 75,
-        'temp_field': None  # Este campo se eliminará
-    }
-]
-
-result = batch_update_items('bas_certifications', updates, log_merge=True)
-print(f"Actualizados: {result['row_count']} registros")
-
-# Eliminar múltiples registros
-to_delete = [
-    {'user_id': '123', 'curso_id': '456'},
-    {'user_id': '123', 'curso_id': '789'}
-]
-
-result = batch_delete_items('bas_certifications', to_delete, user_id='user_id', curso_id='curso_id')
-print(f"Eliminados: {result['row_count']} registros")
-```
-
-**Nota sobre `batch_update_items`:**
-- No requiere especificar los parámetros `user_id` o `curso_id` como en las otras funciones batch
-- Automáticamente detecta PK y SK del schema de la tabla
-- Hace `batch_get` para traer todos los campos actuales
-- Hace merge de datos existentes con los nuevos
-- Soporta eliminación de campos usando `None`
-- Ideal para actualizar múltiples registros preservando campos no especificados
-
-### Incrementos con límites
-
-```python
-from ddb_client.updates import dynamo_increase
-
-# Incrementar score con límite máximo
-params = {
-    'user_id': '425034',
-    'curso_id': '1234',
-    'score_max': 100  # No permitir más de 100
-}
-
-data = {
-    'score': 5  # Incrementar 5 puntos
-}
-
-result = dynamo_increase('bas_certifications', params, data)
-
-# Decrementar con límite mínimo
-params = {
-    'user_id': '425034',
-    'curso_id': '1234',
-    'attempts_min': 0  # No permitir valores negativos
-}
-
-data = {
-    'attempts': -1  # Decrementar 1
-}
-
-result = dynamo_increase('bas_certifications', params, data)
-```
-
-### Búsqueda y actualización en OpenSearch
-
-```python
-from aws_client.open_search.op_searches import op_search
-from aws_client.open_search.op_updates import op_update
-
-# Buscar cursos
-courses = op_search(
-    index_name='courses',
-    query='machine learning',
-    size=10,
-    name_boost=30,
-    description_boost=5
-)
-
-# Actualizar un curso
-update_result = op_update(
-    index_name='courses',
-    document={
-        'course_id': '1234',
-        'students': 5000,
-        'rating': 4.8,
-        'description': 'Curso actualizado de ML'
-    }
-)
-
-if update_result['status']:
-    print("Curso actualizado exitosamente")
-```
-
-### EventBridge con trazabilidad
-
-```python
-from aws_client.aws_lambda import invoke_event_bus, get_lambda_metadata
-
-def lambda_handler(event, context):
-    # Obtener metadata para trazabilidad
-    lambda_meta = get_lambda_metadata(context)
-    
-    # Preparar payload
-    payload = {
-        'user_id': '12345',
-        'action': 'purchase',
-        'course_id': '6789',
-        'amount': 99.99,
-        'params': event.get('queryStringParameters', {}),
-        'authorizer': event.get('requestContext', {}).get('authorizer', {})
-    }
-    
-    # Enviar evento
-    result = invoke_event_bus(
-        EventBusName='edutin-events',
-        Source='course.purchases',
-        payload=payload,
-        DetailType='CoursePurchase',
-        lambda_details=lambda_meta,
-        log_enabled=True
-    )
-    
-    return {
-        'statusCode': 200,
-        'body': json.dumps({
-            'message': 'Event sent',
-            'event_id': result.get('FailedEntryCount', 0) == 0
-        })
-    }
-```
-
-## 🤝 Contribución
-
-### Flujo de trabajo
-
-1. **Fork el repositorio**
-2. **Crea una rama feature**: `git checkout -b feature/nueva-funcionalidad`
-3. **Implementa tus cambios** con tests
-4. **Commit con mensaje descriptivo**: `git commit -m 'feat: agregar nueva funcionalidad'`
-5. **Push a tu fork**: `git push origin feature/nueva-funcionalidad`
-6. **Crea un Pull Request** a `develop`
-
-### Convenciones de código
-
-- **PEP 8**: Seguir las guías de estilo de Python
-- **Type Hints**: Usar anotaciones de tipo en todas las funciones públicas
-- **Docstrings**: Documentar todas las funciones con formato Google Style
-- **Tests**: Incluir tests unitarios para nuevas funcionalidades
-
-### Convenciones de commits
-
-Usamos [Conventional Commits](https://www.conventionalcommits.org/):
-
-- `feat:` Nueva funcionalidad
-- `fix:` Corrección de bug
-- `docs:` Cambios en documentación
-- `refactor:` Refactorización de código
-- `test:` Agregar o modificar tests
-- `chore:` Tareas de mantenimiento
-
-
-## 📄 Licencia
-
-Este proyecto está bajo la Licencia MIT - ver el archivo [LICENSE](LICENSE) para más detalles.
-
-## 📞 Soporte
-
-Para reportar bugs o solicitar funcionalidades:
-
-- 🐛 **Issues**: [GitHub Issues](link-to-issues)
-- 📧 **Email**: support@edutin.com
-- 💬 **Slack**: #aws-layers
-
-## 🔗 Enlaces útiles
-
-- [Documentación de AWS Lambda Layers](https://docs.aws.amazon.com/lambda/latest/dg/configuration-layers.html)
-- [DynamoDB Best Practices](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/best-practices.html)
-- [OpenSearch Documentation](https://opensearch.org/docs/latest/)
-- [Boto3 Documentation](https://boto3.amazonaws.com/v1/documentation/api/latest/index.html)
+- Runtime: Python 3.12
+- Arquitecturas: x86_64 y arm64
 
 ---
 
-**Hecho con ❤️ por el equipo de Edutin**
+## Tabla de Contenidos
+
+- [Variables de Entorno](#variables-de-entorno)
+- [Archivo config.py](#archivo-configpy)
+- [Importación](#importación)
+- [Búsquedas (searches.py)](#búsquedas-searchespy)
+  - [search](#search)
+  - [counter](#counter)
+- [Actualizaciones (updates.py)](#actualizaciones-updatespy)
+  - [create](#create)
+  - [update](#update)
+  - [delete](#delete)
+  - [increase](#increase)
+
+---
+
+## Variables de Entorno
+
+Configura en la Lambda:
+
+- `DB_USER`: Usuario
+- `DB_PASSWORD`: Contraseña
+- `DB_NAME`: Nombre de la base de datos
+- `DB_ENDPOINT_RO` (opcional): Endpoint de solo lectura
+- `DB_ENDPOINT_RW` (opcional): Endpoint de lectura/escritura
+
+---
+
+## Archivo config.py
+
+Crea un archivo `config.py` en la raíz de tu Lambda con los diccionarios de control:
+
+```python
+# Campos a devolver por tabla en SELECT (vacío o no definido = *)
+rds_fields = {
+    'users': ['id', 'name', 'email', 'status'],
+    'orders': [],  # array vacío => traer todos los campos
+    # 'products' no definido => traer todos los campos
+}
+
+# Campos que se pueden ACTUALIZAR/INCREMENTAR por tabla
+rds_allowed_fields = {
+    'users': ['name', 'email', 'status', 'attempts', 'score', 'updated_at'],
+    'orders': ['status', 'total', 'updated_at'],
+}
+
+# Valores por defecto para INSERT
+rds_defaults = {
+    'data': {
+        'users': {'status': 'active', 'role': 'user'},
+        'orders': {'status': 'pending', 'currency': 'USD'}
+    }
+}
+```
+
+---
+
+## Importación
+
+```python
+from mysql_client.searches import search, counter
+from mysql_client.updates import create, update, delete, increase
+```
+
+---
+
+## Búsquedas (searches.py)
+
+### search
+
+Realiza un SELECT con soporte de operadores y control de columnas vía `rds_fields`.
+
+Operadores soportados en `params`:
+- Igualdad (por defecto): `{ "status": "active" }`
+- Comparaciones: `{ "age": {">": 18} }`, `{ "price": {"<=": 100} }`
+- Distinto: `{ "status": {"!=": "deleted"} }`
+- LIKE/NOT LIKE: `{ "name": {"LIKE": "%John%"} }`
+- BETWEEN: `{ "age": {"BETWEEN": [18, 65]} }`
+- IN / NOT IN: `{ "id": {"IN": [1,2,3]} }`
+
+Ejemplos:
+
+```python
+# Búsqueda simple
+users = search('users', { 'status': 'active', 'country': 'US' })
+
+# Búsqueda avanzada
+users = search('users', {
+    'age': {'>': 18},
+    'name': {'LIKE': '%John%'}
+})
+
+# Rango y conjuntos
+products = search('products', {
+    'price': {'BETWEEN': [10, 100]},
+    'category': {'IN': ['electronics', 'books']}
+})
+```
+
+Notas:
+- Si la tabla no está en `rds_fields` o su lista está vacía → `SELECT *`.
+- Usa endpoint RO por defecto.
+
+### counter
+
+Devuelve solo el número de filas que cumplen la condición (no usa `rds_fields`).
+
+```python
+# Conteo simple
+total = counter('users', { 'status': 'active' })
+
+# Conteo con operadores
+pending = counter('orders', {
+    'created_at': {'BETWEEN': ['2025-01-01', '2025-12-31']},
+    'status': {'NOT IN': ['cancelled', 'refunded']}
+})
+```
+
+---
+
+## Actualizaciones (updates.py)
+
+### create
+
+Inserta un registro aplicando valores por defecto desde `rds_defaults['data'][table]`.
+
+```python
+new_id = create('users', {
+    'name': 'John',
+    'email': 'john@example.com'
+})
+# Si hay defaults (p.ej. status='active'), se aplican automáticamente
+```
+
+Requiere endpoint RW.
+
+### update
+
+Actualiza campos permitidos según `rds_allowed_fields[table]`. Rechaza `params` vacío (para evitar updates masivos).
+
+```python
+affected = update('users', { 'id': 123 }, { 'status': 'verified', 'email': 'new@example.com' })
+```
+
+Requiere endpoint RW.
+
+### delete
+
+Elimina filas filtradas por `params`. Rechaza `params` vacío (para evitar deletes masivos).
+
+```python
+deleted = delete('sessions', { 'status': 'expired', 'user_id': 42 })
+```
+
+Requiere endpoint RW.
+
+### increase
+
+Incrementa/decrementa múltiples campos de forma atómica. Solo opera sobre campos permitidos en `rds_allowed_fields[table]`. Soporta límites mínimos y máximos definidos en `params` usando sufijos `_<min|max>`.
+
+- `score_max`: No permitir que `score` supere ese valor
+- `lives_min`: No permitir que `lives` baje de ese valor
+
+```python
+# Incremento simple
+increase('bas_certifications',
+    { 'user_id': '425034', 'curso_id': '1234' },
+    { 'score': 5, 'attempts': 1 }
+)
+
+# Decremento
+increase('bas_game_state',
+    { 'user_id': '425034' },
+    { 'lives': -1, 'credits': -10 }
+)
+
+# Con límite máximo
+increase('bas_certifications',
+    { 'user_id': '425034', 'score_max': 100 },
+    { 'score': 10 }
+)
+# Si score actual es 95, quedará en 100
+
+# Con límite mínimo
+increase('bas_game_state',
+    { 'user_id': '425034', 'lives_min': 0 },
+    { 'lives': -2 }
+)
+# Si lives es 1, quedará en 0
+
+# Múltiples campos con límites
+increase('bas_certifications',
+    {
+      'user_id': '425034',
+      'score_min': 0, 'score_max': 100,
+      'attempts_min': 0, 'attempts_max': 10
+    },
+    { 'score': 5, 'attempts': 1 }
+)
+```
+
+Requiere endpoint RW.
+
+---
